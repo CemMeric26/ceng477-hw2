@@ -11,6 +11,7 @@
 #include "Triangle.h"
 #include "Helpers.h"
 #include "Scene.h"
+#include <corecrt_math_defines.h>
 
 using namespace tinyxml2;
 using namespace std;
@@ -349,6 +350,78 @@ void Scene::convertPPMToPNG(string ppmFileName)
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
+Matrix4 MakeModelingTransformation(Camera *camera, std::vector<Rotation *>& rotations, std::vector<Scaling *>& scalings, std::vector<Translation *>& translations, Mesh& mesh)
+{
+	Matrix4 M = getIdentityMatrix();
+	int numberOfTransformations = mesh.numberOfTransformations; // number of transformations for this mesh
+
+
+	for(int i=0;i<numberOfTransformations;i++){
+		char transformationType = mesh.transformationTypes[i]; // type of transformation
+		int transformationId = mesh.transformationIds[i]; // id of transformation
+
+		// first check transformation type and then apply transformation
+		// first we apply the last transformation 
+		if(transformationType == 'r'){
+			Rotation *rotation = rotations[transformationId-1];
+			Matrix4 R = getIdentityMatrix();
+			double angle = rotation->angle;
+			double ux = rotation->ux;
+			double uy = rotation->uy;
+			double uz = rotation->uz;
+
+			double radian = angle * M_PI / 180.0;
+			double cosTheta = cos(radian);
+			double sinTheta = sin(radian);
+
+			R.values[0][0] = cosTheta + ux*ux*(1-cosTheta);
+			R.values[0][1] = ux*uy*(1-cosTheta) - uz*sinTheta;
+			R.values[0][2] = ux*uz*(1-cosTheta) + uy*sinTheta;
+
+			R.values[1][0] = uy*ux*(1-cosTheta) + uz*sinTheta;
+			R.values[1][1] = cosTheta + uy*uy*(1-cosTheta);
+			R.values[1][2] = uy*uz*(1-cosTheta) - ux*sinTheta;
+
+			R.values[2][0] = uz*ux*(1-cosTheta) - uy*sinTheta;
+			R.values[2][1] = uz*uy*(1-cosTheta) + ux*sinTheta;
+			R.values[2][2] = cosTheta + uz*uz*(1-cosTheta);
+
+			M = multiplyMatrixWithMatrix(R, M);
+		}
+		else if(transformationType == 's'){
+			Scaling *scaling = scalings[transformationId-1];
+			Matrix4 S = getIdentityMatrix();
+			double sx = scaling->sx;
+			double sy = scaling->sy;
+			double sz = scaling->sz;
+
+			S.values[0][0] = sx;
+			S.values[1][1] = sy;
+			S.values[2][2] = sz;
+
+			M = multiplyMatrixWithMatrix(S, M);
+		}
+		else if(transformationType == 't'){
+			Translation *translation = translations[transformationId-1];
+			Matrix4 T = getIdentityMatrix();
+			double tx = translation->tx;
+			double ty = translation->ty;
+			double tz = translation->tz;
+
+			T.values[0][3] = tx;
+			T.values[1][3] = ty;
+			T.values[2][3] = tz;
+
+			M = multiplyMatrixWithMatrix(T, M);
+
+	}
+
+	}
+
+	return M;
+}
+
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
