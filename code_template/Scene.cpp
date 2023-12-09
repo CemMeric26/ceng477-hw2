@@ -347,6 +347,84 @@ void Scene::convertPPMToPNG(string ppmFileName)
 	system(command.c_str());
 }
 
+
+
+void createTranslationMatrix(Matrix4& T , Translation& translation) {
+
+    T.values[0][3] = translation.tx;
+    T.values[1][3] = translation.ty;
+    T.values[2][3] = translation.tz;
+
+}
+
+void createScalingMatrix(Matrix4& S, Scaling& scaling ){
+	S.values[0][0] = scaling.sx;
+	S.values[1][1] = scaling.sy;
+	S.values[2][2] = scaling.sz;
+
+}
+
+void createRotationMatrix(Matrix4& R, Rotation& rotation ){
+	double angle = rotation.angle;
+	double ux = rotation.ux;
+	double uy = rotation.uy;
+	double uz = rotation.uz;
+
+	// find orthonormal basis uvw
+	// to find v setting the smallest component of u to zero and 
+	// swap the other two while negating one:
+	Vec3 u,v,w; 
+
+	u = Vec3(ux,uy,uz,0);
+
+	if (ux <= uy && ux <= uz) {
+		// ux is the smallest
+		v = Vec3(0,-uz,uy,0);
+	} else if (uy <= ux && uy <= uz) {
+		// uy is the smallest
+		v = Vec3(uz,0,-ux,0);		
+	} else {
+		// uz is the smallest
+		v = Vec3(-uy,ux,0,0);
+	}
+
+	w = crossProductVec3(u,v);
+	v= normalizeVec3(v);
+	w = normalizeVec3(w);
+
+	double other[4][4] = { 
+		{ux,uy,uz,0},
+		{v.x,v.y,v.z,0},
+		{w.x, w.y, w.z,0},
+		{0,0,0,1}
+	};
+
+	Matrix4 M = Matrix4(other);
+
+	double radian = angle * M_PI / 180.0;
+	double cosTheta = cos(radian);
+	double sinTheta = sin(radian);
+
+	double rotationMatrix[4][4] = {
+		{1,0,0,0},
+		{0,cosTheta,-sinTheta,0},
+		{0,sinTheta,cosTheta,0},
+		{0,0,0,1}
+	};
+
+	Matrix4 Rx = Matrix4(rotationMatrix);
+
+	double M_inv[4][4] = {
+		{ux,v.x,w.x,0},
+		{uy,v.y,w.y,0},
+		{uz,v.z,w.z,0},
+		{0,0,0,1}
+	};
+	Matrix4 M_inv_matrix = Matrix4(M_inv);
+	
+	R = multiplyMatrixWithMatrix(M_inv_matrix, multiplyMatrixWithMatrix(Rx, M));
+
+}
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
@@ -365,56 +443,28 @@ Matrix4 MakeModelingTransformation(Camera *camera, std::vector<Rotation *>& rota
 		if(transformationType == 'r'){
 			Rotation *rotation = rotations[transformationId-1];
 			Matrix4 R = getIdentityMatrix();
-			double angle = rotation->angle;
-			double ux = rotation->ux;
-			double uy = rotation->uy;
-			double uz = rotation->uz;
-
-			double radian = angle * M_PI / 180.0;
-			double cosTheta = cos(radian);
-			double sinTheta = sin(radian);
-
-			R.values[0][0] = cosTheta + ux*ux*(1-cosTheta);
-			R.values[0][1] = ux*uy*(1-cosTheta) - uz*sinTheta;
-			R.values[0][2] = ux*uz*(1-cosTheta) + uy*sinTheta;
-
-			R.values[1][0] = uy*ux*(1-cosTheta) + uz*sinTheta;
-			R.values[1][1] = cosTheta + uy*uy*(1-cosTheta);
-			R.values[1][2] = uy*uz*(1-cosTheta) - ux*sinTheta;
-
-			R.values[2][0] = uz*ux*(1-cosTheta) - uy*sinTheta;
-			R.values[2][1] = uz*uy*(1-cosTheta) + ux*sinTheta;
-			R.values[2][2] = cosTheta + uz*uz*(1-cosTheta);
+			
+			createRotationMatrix(R, *rotation);
 
 			M = multiplyMatrixWithMatrix(R, M);
 		}
 		else if(transformationType == 's'){
 			Scaling *scaling = scalings[transformationId-1];
 			Matrix4 S = getIdentityMatrix();
-			double sx = scaling->sx;
-			double sy = scaling->sy;
-			double sz = scaling->sz;
-
-			S.values[0][0] = sx;
-			S.values[1][1] = sy;
-			S.values[2][2] = sz;
+			
+			createScalingMatrix(S, *scaling);
 
 			M = multiplyMatrixWithMatrix(S, M);
 		}
 		else if(transformationType == 't'){
 			Translation *translation = translations[transformationId-1];
-			Matrix4 T = getIdentityMatrix();
-			double tx = translation->tx;
-			double ty = translation->ty;
-			double tz = translation->tz;
-
-			T.values[0][3] = tx;
-			T.values[1][3] = ty;
-			T.values[2][3] = tz;
+			Matrix4 T = getIdentityMatrix(); // init as Identity matrix
+			
+			createTranslationMatrix(T, *translation);
 
 			M = multiplyMatrixWithMatrix(T, M);
 
-	}
+		}
 
 	}
 
