@@ -348,7 +348,7 @@ void Scene::convertPPMToPNG(string ppmFileName)
 }
 
 
-
+// translation transformation is applied in this function
 void createTranslationMatrix(Matrix4& T , Translation& translation) {
 
     T.values[0][3] = translation.tx;
@@ -356,7 +356,7 @@ void createTranslationMatrix(Matrix4& T , Translation& translation) {
     T.values[2][3] = translation.tz;
 
 }
-
+// scaling transformation is applied in this function
 void createScalingMatrix(Matrix4& S, Scaling& scaling ){
 	S.values[0][0] = scaling.sx;
 	S.values[1][1] = scaling.sy;
@@ -364,6 +364,7 @@ void createScalingMatrix(Matrix4& S, Scaling& scaling ){
 
 }
 
+// rotation transformation is applied in this function
 void createRotationMatrix(Matrix4& R, Rotation& rotation ){
 	double angle = rotation.angle;
 	double ux = rotation.ux;
@@ -425,9 +426,7 @@ void createRotationMatrix(Matrix4& R, Rotation& rotation ){
 	R = multiplyMatrixWithMatrix(M_inv_matrix, multiplyMatrixWithMatrix(Rx, M));
 
 }
-/*
-	Transformations, clipping, culling, rasterization are done here.
-*/
+// all three transformations are applied in this function
 Matrix4 MakeModelingTransformation(Camera *camera, std::vector<Rotation *>& rotations, std::vector<Scaling *>& scalings, std::vector<Translation *>& translations, Mesh& mesh)
 {
 	Matrix4 M = getIdentityMatrix();
@@ -472,6 +471,110 @@ Matrix4 MakeModelingTransformation(Camera *camera, std::vector<Rotation *>& rota
 }
 
 
+Matrix4 MakeCameraTransformation(Camera *camera)
+{
+	Matrix4 M_cam = getIdentityMatrix();
+
+	Vec3 u = camera->u;
+	Vec3 v = camera->v;
+	Vec3 w = camera->w;
+
+	double cameraMatrix[4][4] = {
+		{u.x,u.y,u.z,0},
+		{v.x,v.y,v.z,0},
+		{w.x,w.y,w.z,0},
+		{0,0,0,1}
+	};
+
+	Matrix4 C = Matrix4(cameraMatrix);
+
+	double cameraTranslationMatrix[4][4] = {
+		{1,0,0,-camera->position.x},
+		{0,1,0,-camera->position.y},
+		{0,0,1,-camera->position.z},
+		{0,0,0,1}
+	};
+
+	Matrix4 T = Matrix4(cameraTranslationMatrix);
+
+	M_cam = multiplyMatrixWithMatrix(C, T);
+
+	return M_cam;
+}
+
+Matrix4 MakeProjectionTransformation(Camera *camera)
+{
+	Matrix4 M_proj = getIdentityMatrix();
+
+	double left = camera->left;
+	double right = camera->right;
+	double bottom = camera->bottom;
+	double top = camera->top;
+	double near = camera->near;
+	double far = camera->far;
+
+
+	if(camera->projectionType == ORTOGRAPHIC_PROJECTION){ // orthographic projection
+		// formula is given in the slides like:
+		// 2/(r-l) 0 0 -(r+l)/(r-l)
+		// 0 2/(t-b) 0 -(t+b)/(t-b)
+		// 0 0 2/(n-f) -(n+f)/(n-f)
+		// 0 0 0 1
+
+		double orthographicMatrix[4][4] = {
+			{2/(right - left),0,0,-(right + left)/(right - left)},
+			{0,2/(top - bottom),0,-(top + bottom)/(top - bottom)},
+			{0,0,2/(near - far),-(near + far)/(near - far)},
+			{0,0,0,1}
+		};
+
+		M_proj = Matrix4(orthographicMatrix);
+	}
+	else if(camera->projectionType == PERSPECTIVE_PROJECTION){ // perspective projection
+		// formula is given in the slides like:
+		// 2n/(r-l) 0 (r+l)/(r-l) 0
+		// 0 2n/(t-b) (t+b)/(t-b) 0
+		// 0 0 -(f+n)/(f-n) -2fn/(f-n)
+		// 0 0 -1 0
+		double perspectiveMatrix[4][4] = {
+			{2*near/(right - left),0,(right + left)/(right - left),0},
+			{0,2*near/(top - bottom),(top + bottom)/(top - bottom),0},
+			{0,0,-(far + near)/(far - near),-2*far*near/(far - near)},
+			{0,0,-1,0}
+		};
+
+		M_proj = Matrix4(perspectiveMatrix);
+	}
+
+	return M_proj;
+}
+
+Matrix4 MakeViewportTransformation(Camera *camera)
+{
+	Matrix4 M_vp = getIdentityMatrix();
+
+	double horRes = camera->horRes; // horizontal resolution = n_x
+	double verRes = camera->verRes; // vertical resolution = n_y
+
+	// matrix formula of Mvp
+	// n_x/2 0 0 (n_x-1)/2 + xmin
+	// 0 n_y/2 0 (n_y-1)/2 + ymin
+	// 0 0 1 0.5
+	double viewportMatrix[4][4] = {
+		{horRes/2,0,0,(horRes-1)/2},
+		{0,verRes/2,0,(verRes-1)/2},
+		{0,0,0.5,0.5},
+		{0,0,0,1}
+	};
+
+	M_vp = Matrix4(viewportMatrix);
+
+	return M_vp;
+}	
+
+/*
+	Transformations, clipping, culling, rasterization are done here.
+*/
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
