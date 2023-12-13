@@ -675,7 +675,35 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
 	// line rasterization algorithm is given in the slides
-	;
+	// algorithm with color interpolation 
+
+	double y = p1.y;
+	double d = (p1.y - p2.y) + ((p2.x - p1.x)/2); // initial d value
+
+	Color c = c1; // initial color
+	Color* cComp = new Color(); // color component
+
+	cComp->r = (c2.r - c1.r)/(p2.x - p1.x); // color component for r
+	cComp->g = (c2.g - c1.g)/(p2.x - p1.x); // color component for g
+	cComp->b = (c2.b - c1.b)/(p2.x - p1.x); // color component for b
+
+	for(int x=p1.x;x<=p2.x;x++){
+		// draw(x,y,round(c))
+		if(x >= 0 && x < image.size() && y >= 0 && y < image[0].size()){
+			if(depth[x][y] > p1.z){
+				image[x][y] = c; // color should i round it?
+				depth[x][y] = p1.z;
+			}
+		}
+		if(d < 0){ // choose NE
+			y = y + 1;
+			d = d + (p1.y - p2.y) + (p2.x - p1.x);
+		}
+		else{ //Choose E
+			d = d + (p1.y - p2.y);
+		}
+		c.r = c.r + cComp->r; c.g = c.g + cComp->g; c.b = c.b + cComp->b;
+	}
 }
 
 void triangleRasterizationFunc(Vec4& p1, Vec4& p2, Vec4& p3, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
@@ -736,7 +764,6 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			transformVertices(CameraModelingAndProjectionMatrix, v1, v1_4);
 			transformVertices(CameraModelingAndProjectionMatrix, v2, v2_4);
 			transformVertices(CameraModelingAndProjectionMatrix, v3, v3_4);
-
 
 			// culling will be done here if it is enabled
 			if(this->cullingEnabled){
