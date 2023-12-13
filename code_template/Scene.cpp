@@ -605,7 +605,7 @@ bool visibleLB(double den, double num, double t_e, double t_l){
 // returns true if line is visible
 // returns false if line is invisible
 bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ymin, double ymax,double zmin, double zmax){
-	// TODO: implement this function
+
 	double t_e = 0;
 	double t_l = 1;
 	double dx = p2.x - p1.x;
@@ -638,7 +638,29 @@ bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ym
 		}
 
 	}
+
+	return visible;
 }
+
+bool checkBackfaceCulling(Vec3& p1, Vec3& p2, Vec3& p3){
+
+	Vec3 v1 = Vec3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z); // v1 = p2 - p1
+	Vec3 v2 = Vec3(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z); // v2 = p3 - p1
+
+	Vec3 normal = normalizeVec3(crossProductVec3(v1,v2)); // normal = v1 x v2
+	Vec3 view = p1; // is this true for view vector = view = p1 - origin
+
+	double dotProduct = dotProductVec3(normal, view);
+
+	if(dotProduct > 0){
+		return true;
+	}
+	else{
+		return false;
+	}
+
+}
+
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -646,4 +668,61 @@ bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ym
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
+	Matrix4 CameraMatrix = MakeCameraTransformation(camera);
+	Matrix4 ProjectionMatrix = MakeProjectionTransformation(camera);
+	Matrix4 ViewportMatrix = MakeViewportTransformation(camera);
+
+	// now we have to apply all transformations to each vertex/mesh
+	int numberOfMeshes = this->meshes.size();
+
+	for(int i=0;i<numberOfMeshes;i++){
+		Mesh *mesh = this->meshes[i];
+		int numberOfTriangles = mesh->numberOfTriangles;
+
+		// beforehand calculation of the necessary matrices and multiply them to get ONE Transformation matrix
+		Matrix4 ModelingMatrix = MakeModelingTransformation(camera, this->rotations, this->scalings, this->translations, *mesh);
+		Matrix4 CameraAndModelingMatrix = multiplyMatrixWithMatrix(CameraMatrix, ModelingMatrix);
+		Matrix4 CameraModelingAndProjectionMatrix = multiplyMatrixWithMatrix(ProjectionMatrix, CameraAndModelingMatrix);
+
+		for(int j=0;j<numberOfTriangles;j++){
+			Triangle triangle = mesh->triangles[j];
+			int v1Id = triangle.vertexIds[0];
+			int v2Id = triangle.vertexIds[1];
+			int v3Id = triangle.vertexIds[2];
+
+			// get vertices and colors
+			Vec3 *v1 = this->vertices[v1Id-1];
+			Vec3 *v2 = this->vertices[v2Id-1];
+			Vec3 *v3 = this->vertices[v3Id-1];
+
+			Color *c1 = this->colorsOfVertices[v1->colorId-1];
+			Color *c2 = this->colorsOfVertices[v2->colorId-1];
+			Color *c3 = this->colorsOfVertices[v3->colorId-1];
+
+			// apply transformations to vertices // first make them Vec4
+			Vec4 v1_4 = Vec4(v1->x, v1->y, v1->z, 1,v1->colorId); // first vertex
+			Vec4 v2_4 = Vec4(v2->x, v2->y, v2->z, 1, v2->colorId); // second vertex
+			Vec4 v3_4 = Vec4(v3->x, v3->y, v3->z, 1, v3->colorId); // third vertex
+
+			// apply transformations to vertices
+			v1_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v1_4);
+			v2_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v2_4);
+			v3_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v3_4);
+
+			// clipping will be done here
+
+			// culling will be done here if it is enabled
+
+			// perspective division before viewport transformation
+
+			// viewport transformation will be done here
+
+			// rasterization will be done here
+
+			//final
+
+
+	}
+
+
 }
