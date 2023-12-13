@@ -470,7 +470,6 @@ Matrix4 MakeModelingTransformation(Camera *camera, std::vector<Rotation *>& rota
 	return M;
 }
 
-
 Matrix4 MakeCameraTransformation(Camera *camera)
 {
 	Matrix4 M_cam = getIdentityMatrix();
@@ -571,6 +570,75 @@ Matrix4 MakeViewportTransformation(Camera *camera)
 
 	return M_vp;
 }	
+
+bool visibleLB(double den, double num, double t_e, double t_l){
+
+	// the formula is given in the slides as bool visible
+	double t;
+	if(den > 0){ // potentially entering
+		t = num/den;
+		if(t > t_l){
+			return false;
+		}
+		else if(t > t_e){
+			t_e = t;
+		}
+	}
+	else if(den < 0){ // potentially leaving
+		t = num/den;
+		if(t < t_e){
+			return false;
+		}
+		else if(t < t_l){
+			t_l = t;
+		}
+	}
+	else if(num > 0){ // line parallel to edge 
+		return false;
+	}
+
+	return true;
+
+}
+
+// function for clipping algorithm: liang-barsky choosen
+// returns true if line is visible
+// returns false if line is invisible
+bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ymin, double ymax,double zmin, double zmax){
+	// TODO: implement this function
+	double t_e = 0;
+	double t_l = 1;
+	double dx = p2.x - p1.x;
+	double dy = p2.y - p1.y;
+	double dz = p2.z - p1.z;
+	bool visible = false;
+
+	if(visibleLB(dx,xmin-p1.x,t_e,t_l)){ // left
+		if(visibleLB(-dx,p1.x-xmax,t_e,t_l)){ // right
+			if(visibleLB(dy,ymin-p1.y,t_e,t_l)){ // bottom
+				if(visibleLB(-dy,p1.y-ymax,t_e,t_l)){ // top
+					if(visibleLB(dz,zmin-p1.z,t_e,t_l)){ // front
+						if(visibleLB(-dz,p1.z-zmax,t_e,t_l)){ // bCK
+							if(t_l < 1){
+								p2.x = p1.x + t_l*dx;
+								p2.y = p1.y + t_l*dy;
+								p2.z = p1.z + t_l*dz;
+							}
+							if(t_e > 0){
+								p1.x = p1.x + t_e*dx;
+								p1.y = p1.y + t_e*dy;
+								p1.z = p1.z + t_e*dz;
+							}
+							visible = true;
+						}
+					}
+				
+				}
+			}
+		}
+
+	}
+}
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
