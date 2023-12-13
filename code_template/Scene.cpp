@@ -741,6 +741,14 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				bool visibleLine2 = clippingLiangBarsky(*c2,*c3,v2_4, v3_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
 				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4, v1_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
 
+				// now perspective division will be done here
+				v1_4.x = v1_4.x/v1_4.t; v1_4.y = v1_4.y/v1_4.t; v1_4.z = v1_4.z/v1_4.t; // first vertex division by the t component
+				v2_4.x = v2_4.x/v2_4.t; v2_4.y = v2_4.y/v2_4.t; v2_4.z = v2_4.z/v2_4.t; // second vertex division by the t component
+				v3_4.x = v3_4.x/v3_4.t; v3_4.y = v3_4.y/v3_4.t; v3_4.z = v3_4.z/v3_4.t; // third vertex division by the t component
+
+				
+
+
 			}
 			else{
 				// solid mesh
