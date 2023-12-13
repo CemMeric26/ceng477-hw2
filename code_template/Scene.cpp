@@ -571,7 +571,7 @@ Matrix4 MakeViewportTransformation(Camera *camera)
 	return M_vp;
 }	
 
-bool visibleLB(double den, double num, double t_e, double t_l){
+bool visibleLB(double den, double num, double& t_e, double& t_l){
 
 	// the formula is given in the slides as bool visible
 	double t;
@@ -581,7 +581,7 @@ bool visibleLB(double den, double num, double t_e, double t_l){
 			return false;
 		}
 		else if(t > t_e){
-			t_e = t;
+			t_e = t; // t_e changed
 		}
 	}
 	else if(den < 0){ // potentially leaving
@@ -590,7 +590,7 @@ bool visibleLB(double den, double num, double t_e, double t_l){
 			return false;
 		}
 		else if(t < t_l){
-			t_l = t;
+			t_l = t; // t_l changed
 		}
 	}
 	else if(num > 0){ // line parallel to edge 
@@ -604,30 +604,42 @@ bool visibleLB(double den, double num, double t_e, double t_l){
 // function for clipping algorithm: liang-barsky choosen
 // returns true if line is visible
 // returns false if line is invisible
-bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ymin, double ymax,double zmin, double zmax){
-
+bool clippingLiangBarsky(Color& c1, Color& c2,Vec4& p1, Vec4& p2, double xmin, double xmax, double ymin, double ymax,double zmin, double zmax){
+	// You should interpolate the colors for the new vertices. 
+	// You need to calculate the new color based on the distances 
+	// to the original vertices.
 	double t_e = 0;
 	double t_l = 1;
 	double dx = p2.x - p1.x;
 	double dy = p2.y - p1.y;
 	double dz = p2.z - p1.z;
 	bool visible = false;
+	Color* cComp = new Color();
+	cComp->r = c2.r - c1.r; cComp->g = c2.g - c1.g; cComp->b = c2.b - c1.b;
 
+
+	// code ay be problematic te and t_l values should change in visible function 
+	// if so it should be referenced
+	// and should we do color calculations here or in the rasterization part
 	if(visibleLB(dx,xmin-p1.x,t_e,t_l)){ // left
 		if(visibleLB(-dx,p1.x-xmax,t_e,t_l)){ // right
 			if(visibleLB(dy,ymin-p1.y,t_e,t_l)){ // bottom
 				if(visibleLB(-dy,p1.y-ymax,t_e,t_l)){ // top
 					if(visibleLB(dz,zmin-p1.z,t_e,t_l)){ // front
-						if(visibleLB(-dz,p1.z-zmax,t_e,t_l)){ // bCK
+						if(visibleLB(-dz,p1.z-zmax,t_e,t_l)){ // baCK
 							if(t_l < 1){
 								p2.x = p1.x + t_l*dx;
 								p2.y = p1.y + t_l*dy;
 								p2.z = p1.z + t_l*dz;
+								// color interpolation as in the forum
+								c2.r = c1.r + t_l*cComp->r; c2.g = c1.g + t_l*cComp->g; c2.b = c1.b + t_l*cComp->b;
 							}
 							if(t_e > 0){
 								p1.x = p1.x + t_e*dx;
 								p1.y = p1.y + t_e*dy;
 								p1.z = p1.z + t_e*dz;
+								// color interpolation
+								c1.r = c1.r + t_e*cComp->r; c1.g = c1.g + t_e*cComp->g; c1.b = c1.b + t_e*cComp->b;
 							}
 							visible = true;
 						}
@@ -642,18 +654,18 @@ bool clippingLiangBarsky(Vec3& p1, Vec3& p2, double xmin, double xmax, double ym
 	return visible;
 }
 
-bool checkBackfaceCulling(Vec3& p1, Vec3& p2, Vec3& p3){
+bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 	Vec3 v1 = Vec3(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z); // v1 = p2 - p1
 	Vec3 v2 = Vec3(p3.x - p1.x, p3.y - p1.y, p3.z - p1.z); // v2 = p3 - p1
 
 	Vec3 normal = normalizeVec3(crossProductVec3(v1,v2)); // normal = v1 x v2
-	Vec3 view = p1; // is this true for view vector = view = p1 - origin
+	Vec3 view = {p1.x,p1.y,p1.z}; // is this true for view vector = view = p1 - origin
 
 	double dotProduct = dotProductVec3(normal, view);
 
 	if(dotProduct > 0){
-		return true;
+		return true; // this means that the triangle is not visible
 	}
 	else{
 		return false;
@@ -709,9 +721,33 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			v2_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v2_4);
 			v3_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v3_4);
 
-			// clipping will be done here
-
 			// culling will be done here if it is enabled
+			if(this->cullingEnabled){
+				bool notVisible = checkBackfaceCulling(v1_4, v2_4, v3_4); // returns true if its backfaced
+				if(notVisible){
+					continue;
+				}
+			}
+
+			// clipping will be done here
+			// NOTE: Clipping will be applied for only Wireframe mode
+			// type=0 for wireframe, type=1 for solid
+			if(mesh->type == WIREFRAME_MESH){
+				// clipping algorithm: liang-barsky
+				// returns true if line is visible
+				// returns false if line is invisible
+				// two edges (v1,v2), (v2,v3), (v3,v1)
+				bool visibleLine1 = clippingLiangBarsky(*c1,*c2,v1_4, v2_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far); 
+				bool visibleLine2 = clippingLiangBarsky(*c2,*c3,v2_4, v3_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
+				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4, v1_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
+
+			}
+			else{
+				// solid mesh
+				;
+			}
+
+			
 
 			// perspective division before viewport transformation
 
