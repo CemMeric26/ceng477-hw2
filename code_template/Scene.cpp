@@ -673,6 +673,26 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 }
 
+void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
+	// line rasterization algorithm is given in the slides
+	;
+}
+
+void triangleRasterizationFunc(Vec4& p1, Vec4& p2, Vec4& p3, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
+	// triangle rasterization algorithm is given in the slides
+	;
+}
+
+
+// Helper function to transform vertices
+void transformVertices(const Matrix4& AppliedMatrix, Vec3* vertex, Vec4& transformedVertex) {
+    // Convert Vec3 to Vec4
+    transformedVertex = Vec4(vertex->x, vertex->y, vertex->z, 1, vertex->colorId);
+
+    // Apply transformation
+    transformedVertex = multiplyMatrixWithVec4(AppliedMatrix, transformedVertex);
+}
+
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -711,15 +731,12 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			Color *c2 = this->colorsOfVertices[v2->colorId-1];
 			Color *c3 = this->colorsOfVertices[v3->colorId-1];
 
-			// apply transformations to vertices // first make them Vec4
-			Vec4 v1_4 = Vec4(v1->x, v1->y, v1->z, 1,v1->colorId); // first vertex
-			Vec4 v2_4 = Vec4(v2->x, v2->y, v2->z, 1, v2->colorId); // second vertex
-			Vec4 v3_4 = Vec4(v3->x, v3->y, v3->z, 1, v3->colorId); // third vertex
+			// Apply transformations to vertices
+			Vec4 v1_4, v2_4, v3_4;
+			transformVertices(CameraModelingAndProjectionMatrix, v1, v1_4);
+			transformVertices(CameraModelingAndProjectionMatrix, v2, v2_4);
+			transformVertices(CameraModelingAndProjectionMatrix, v3, v3_4);
 
-			// apply transformations to vertices
-			v1_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v1_4);
-			v2_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v2_4);
-			v3_4 = multiplyMatrixWithVec4(CameraModelingAndProjectionMatrix, v3_4);
 
 			// culling will be done here if it is enabled
 			if(this->cullingEnabled){
@@ -746,8 +763,15 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				v2_4.x = v2_4.x/v2_4.t; v2_4.y = v2_4.y/v2_4.t; v2_4.z = v2_4.z/v2_4.t; // second vertex division by the t component
 				v3_4.x = v3_4.x/v3_4.t; v3_4.y = v3_4.y/v3_4.t; v3_4.z = v3_4.z/v3_4.t; // third vertex division by the t component
 
-				
+				// now viewport transformation will be done here
+				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
+				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
+				v3_4 = multiplyMatrixWithVec4(ViewportMatrix, v3_4);
 
+				// now rasterization will be done here
+				if(visibleLine1){
+					// lineRasterization function
+				}
 
 			}
 			else{
@@ -766,7 +790,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			//final
 
 
+		}
+
+
 	}
-
-
 }
