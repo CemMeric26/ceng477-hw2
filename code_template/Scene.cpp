@@ -11,11 +11,12 @@
 #include "Triangle.h"
 #include "Helpers.h"
 #include "Scene.h"
-#include <corecrt_math_defines.h>
+
 
 using namespace tinyxml2;
 using namespace std;
 
+#define M_PI 3.14159265358979323846
 /*
 	Parses XML file
 */
