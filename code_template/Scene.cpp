@@ -560,8 +560,8 @@ Matrix4 MakeViewportTransformation(Camera *camera)
 	// 0 n_y/2 0 (n_y-1)/2 + ymin
 	// 0 0 1 0.5
 	double viewportMatrix[4][4] = {
-		{horRes/2,0,0,(horRes-1)/2},
-		{0,verRes/2,0,(verRes-1)/2},
+		{horRes*0.5,0,0,(horRes-1)*0.5},
+		{0,verRes*0.5,0,(verRes-1)*0.5},
 		{0,0,0.5,0.5},
 		{0,0,0,1}
 	};
@@ -651,6 +651,9 @@ bool clippingLiangBarsky(Color& c1, Color& c2,Vec4& p1, Vec4& p2, double xmin, d
 
 	}
 
+	// to avoid memory leak
+	delete cComp;
+
 	return visible;
 }
 
@@ -678,7 +681,7 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 	// algorithm with color interpolation 
 
 	double y = p1.y;
-	double d = (p1.y - p2.y) + ((p2.x - p1.x)/2); // initial d value
+	double d = (p1.y - p2.y) + (0.5*(p2.x - p1.x)); // initial d value
 
 	Color c = c1; // initial color
 	Color* cComp = new Color(); // color component
@@ -687,12 +690,17 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 	cComp->g = (c2.g - c1.g)/(p2.x - p1.x); // color component for g
 	cComp->b = (c2.b - c1.b)/(p2.x - p1.x); // color component for b
 
+	// i should also check if the slope is greater than 1 or not
+
 	for(int x=p1.x;x<=p2.x;x++){
 		// draw(x,y,round(c))
 		if(x >= 0 && x < image.size() && y >= 0 && y < image[0].size()){
-			if(depth[x][y] > p1.z){
-				image[x][y] = c; // color should i round it?
-				depth[x][y] = p1.z;
+			if(depth[x][y] > p1.z){ // depth buffer check
+				
+				// image[x][y] = c; 
+				image[x][y].r = round(c.r); image[x][y].g = round(c.g); image[x][y].b = round(c.b); //Q: should i cast to int??
+
+				depth[x][y] = p1.z; // depth buffer update
 			}
 		}
 		if(d < 0){ // choose NE
@@ -704,6 +712,9 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 		}
 		c.r = c.r + cComp->r; c.g = c.g + cComp->g; c.b = c.b + cComp->b;
 	}
+
+	// to avoid memory leak
+	delete cComp;
 }
 
 void triangleRasterizationFunc(Vec4& p1, Vec4& p2, Vec4& p3, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
@@ -719,6 +730,14 @@ void transformVertices(const Matrix4& AppliedMatrix, Vec3* vertex, Vec4& transfo
 
     // Apply transformation
     transformedVertex = multiplyMatrixWithVec4(AppliedMatrix, transformedVertex);
+}
+
+// Function to perform perspective division on a vertex
+void perspectiveDivide(double &x, double &y, double &z, double &t) {
+    x /= t;
+    y /= t;
+    z /= t;
+    t = 1; // Normalizing the t component after division
 }
 
 
@@ -786,10 +805,14 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4, v1_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
 
 				// now perspective division will be done here
-				v1_4.x = v1_4.x/v1_4.t; v1_4.y = v1_4.y/v1_4.t; v1_4.z = v1_4.z/v1_4.t; // first vertex division by the t component
+				/* v1_4.x = v1_4.x/v1_4.t; v1_4.y = v1_4.y/v1_4.t; v1_4.z = v1_4.z/v1_4.t; // first vertex division by the t component
 				v2_4.x = v2_4.x/v2_4.t; v2_4.y = v2_4.y/v2_4.t; v2_4.z = v2_4.z/v2_4.t; // second vertex division by the t component
 				v3_4.x = v3_4.x/v3_4.t; v3_4.y = v3_4.y/v3_4.t; v3_4.z = v3_4.z/v3_4.t; // third vertex division by the t component
-
+ */
+				perspectiveDivide(v1_4.x, v1_4.y, v1_4.z, v1_4.t);
+				perspectiveDivide(v2_4.x, v2_4.y, v2_4.z, v2_4.t);
+				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
+				
 				// now viewport transformation will be done here
 				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
 				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
@@ -799,22 +822,18 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				if(visibleLine1){
 					// lineRasterization function
 				}
+				if(visibleLine2){
+					// lineRasterization function
+				}
+				if(visibleLine3){
+					// lineRasterization function
+				}
 
 			}
 			else{
 				// solid mesh
 				;
 			}
-
-			
-
-			// perspective division before viewport transformation
-
-			// viewport transformation will be done here
-
-			// rasterization will be done here
-
-			//final
 
 
 		}
