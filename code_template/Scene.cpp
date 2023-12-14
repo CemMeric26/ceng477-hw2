@@ -676,23 +676,24 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 }
 
-void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
+/* void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
 	// line rasterization algorithm is given in the slides
 	// algorithm with color interpolation 
 
 	double y = p1.y;
-	double d = (p1.y - p2.y) + (0.5*(p2.x - p1.x)); // initial d value
+	double d = 2*(p1.y - p2.y) + (p2.x - p1.x); // initial d valueused 2* to eliminate the floating point point operations
 
 	Color c = c1; // initial color
-	Color* cComp = new Color(); // color component
+	Color* dc = new Color(); // color component
 
-	cComp->r = (c2.r - c1.r)/(p2.x - p1.x); // color component for r
-	cComp->g = (c2.g - c1.g)/(p2.x - p1.x); // color component for g
-	cComp->b = (c2.b - c1.b)/(p2.x - p1.x); // color component for b
+	// not sure if its correct
+	dc->r = (c2.r - c1.r)/(p2.x - p1.x); // color component for r
+	dc->g = (c2.g - c1.g)/(p2.x - p1.x); // color component for g
+	dc->b = (c2.b - c1.b)/(p2.x - p1.x); // color component for b
 
 	// i should also check if the slope is greater than 1 or not
 
-	for(int x=p1.x;x<=p2.x;x++){
+	for(int x=p1.x;x <=p2.x;x++){
 		// draw(x,y,round(c))
 		if(x >= 0 && x < image.size() && y >= 0 && y < image[0].size()){
 			if(depth[x][y] > p1.z){ // depth buffer check
@@ -705,21 +706,130 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 		}
 		if(d < 0){ // choose NE
 			y = y + 1;
-			d = d + (p1.y - p2.y) + (p2.x - p1.x);
+			d = d + 2*((p1.y - p2.y) + (p2.x - p1.x)); // to avoid floating point operations
 		}
 		else{ //Choose E
-			d = d + (p1.y - p2.y);
+			d = d + 2*(p1.y - p2.y); // to avoid floating point operations
 		}
-		c.r = c.r + cComp->r; c.g = c.g + cComp->g; c.b = c.b + cComp->b;
+		c.r = c.r + dc->r; c.g = c.g + dc->g; c.b = c.b + dc->b;
 	}
 
 	// to avoid memory leak
-	delete cComp;
+	delete dc;
+}
+ */
+
+// line rasterization function with slope greater than 1 is included
+void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
+    // Check if the slope of the line is steep (greater than 1)
+    bool slope = std::abs(p2.y - p1.y) > std::abs(p2.x - p1.x); // slope = y2 - y1 > x2 - x1
+
+    if (slope) {
+        // Swap x and y coordinates for both points
+        std::swap(p1.x, p1.y);
+        std::swap(p2.x, p2.y);
+    }
+
+    // Ensure that we always draw from left to right
+    if (p1.x > p2.x) {
+        std::swap(p1, p2);
+        std::swap(c1, c2);
+    }
+
+    double dx = p2.x - p1.x;
+    double dy = std::abs(p2.y - p1.y);
+    double d = 2 * dy - dx; // Adjusted for slope slope
+    double yStep = (p2.y - p1.y) > 0 ? 1 : -1;
+    double y = p1.y;
+
+    Color c = c1;
+    Color* dc = new Color();
+	dc->r = (c2.r - c1.r) / dx;
+	dc->g = (c2.g - c1.g) / dx;
+	dc->b = (c2.b - c1.b) / dx;
+    /* if (slope) {
+        // Adjust color step for slope slope
+		// if slope is going up divide to dy but didnt we already swapped the values??
+        dc->r = (c2.r - c1.r) / dy;
+        dc->g = (c2.g - c1.g) / dy;
+        dc->b = (c2.b - c1.b) / dy;
+    } else {
+		// if slope is going up divide to dx
+        dc->r = (c2.r - c1.r) / dx;
+        dc->g = (c2.g - c1.g) / dx;
+        dc->b = (c2.b - c1.b) / dx;
+    } */
+
+    for (int x = p1.x; x <= p2.x; x++) {
+        if (slope) {
+            // Swap x and y when drawing for slope lines
+            if (y >= 0 && y < image.size() && x >= 0 && x < image[0].size() && depth[y][x] > p1.z) {
+                image[y][x].r = (round(c.r));
+                image[y][x].g = (round(c.g));
+                image[y][x].b = (round(c.b));
+                depth[y][x] = p1.z;
+            }
+        } else {
+            if (x >= 0 && x < image.size() && y >= 0 && y < image[0].size() && depth[x][y] > p1.z) {
+                image[x][y].r = (round(c.r));
+                image[x][y].g = (round(c.g));
+                image[x][y].b = (round(c.b));
+                depth[x][y] = p1.z;
+            }
+        }
+
+        if (d < 0) {
+            y += yStep;
+            d += 2 * (dy + dx);
+        } else {
+            d += 2 * dy;
+        }
+
+        c.r += dc->r;
+        c.g += dc->g;
+        c.b += dc->b;
+    }
+
+    delete dc;
 }
 
-void triangleRasterizationFunc(Vec4& p1, Vec4& p2, Vec4& p3, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
+double f_xy(double x, double y, double x0, double y0, double x1, double y1) {
+    return x * (y0 - y1) + y * (x1 - x0) + (x0 * y1 - y0 * x1);
+}
+
+
+void triangleRasterizationFunc(Vec4& p0, Vec4& p1, Vec4& p2, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
 	// triangle rasterization algorithm is given in the slides
-	;
+
+	int y_min = std::min(std::min(p0.y, p1.y), p2.y);
+	int y_max = std::max(std::max(p0.y, p1.y), p2.y);
+	int x_min = std::min(std::min(p0.x, p1.x), p2.x);
+	int x_max = std::max(std::max(p0.x, p1.x), p2.x);
+
+	double f01 = f_xy(p2.x, p2.y, p0.x, p0.y, p1.x, p1.y);
+	double f12 = f_xy(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
+	double f20 = f_xy(p1.x, p1.y, p2.x, p2.y, p0.x, p0.y);
+
+
+	for(int y=y_min; y<y_max;y++){
+		for(int x=x_min;x<x_max;x++){
+			double alpha = f_xy(x,y,p1.x,p1.y,p2.x,p2.y)/f01;
+			double beta = f_xy(x,y,p2.x,p2.y,p0.x,p0.y)/f12;
+			double gamma = f_xy(x,y,p0.x,p0.y,p1.x,p1.y)/f20;
+
+			if(alpha >= 0 && beta >= 0 && gamma >= 0){
+				double z = alpha*p0.z + beta*p1.z + gamma*p2.z;
+				if(z < depth[x][y]){
+					depth[x][y] = z;
+					image[x][y].r = round(alpha*c1.r + beta*c2.r + gamma*c3.r);
+					image[x][y].g = round(alpha*c1.g + beta*c2.g + gamma*c3.g);
+					image[x][y].b = round(alpha*c1.b + beta*c2.b + gamma*c3.b);
+				}
+			}
+		}
+			
+	}
+
 }
 
 
@@ -812,7 +922,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				perspectiveDivide(v1_4.x, v1_4.y, v1_4.z, v1_4.t);
 				perspectiveDivide(v2_4.x, v2_4.y, v2_4.z, v2_4.t);
 				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
-				
+
 				// now viewport transformation will be done here
 				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
 				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
@@ -821,23 +931,36 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// now rasterization will be done here
 				if(visibleLine1){
 					// lineRasterization function
+					lineRasterizationFunc(v1_4, v2_4, *c1, *c2, this->image, this->depth);
 				}
 				if(visibleLine2){
 					// lineRasterization function
+					lineRasterizationFunc(v2_4, v3_4, *c2, *c3, this->image, this->depth);
 				}
 				if(visibleLine3){
 					// lineRasterization function
+					lineRasterizationFunc(v3_4, v1_4, *c3, *c1, this->image, this->depth);
 				}
 
 			}
 			else{
 				// solid mesh
-				;
+				// no clipping,Clipping will be applied for only Wireframe mode
+				perspectiveDivide(v1_4.x, v1_4.y, v1_4.z, v1_4.t);
+				perspectiveDivide(v2_4.x, v2_4.y, v2_4.z, v2_4.t);
+				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
+
+				// now viewport transformation will be done here
+				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
+				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
+				v3_4 = multiplyMatrixWithVec4(ViewportMatrix, v3_4);
+
+				// now rasterization will be done here
+				triangleRasterizationFunc(v1_4, v2_4, v3_4, *c1, *c2, *c3, this->image, this->depth);
+
 			}
 
-
 		}
-
 
 	}
 }
