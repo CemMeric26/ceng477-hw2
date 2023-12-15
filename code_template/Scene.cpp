@@ -523,9 +523,9 @@ Matrix4 MakeProjectionTransformation(Camera *camera)
 		// 0 0 0 1
 
 		double orthographicMatrix[4][4] = {
-			{2/(right - left),0,0,-(right + left)/(right - left)},
-			{0,2/(top - bottom),0,-(top + bottom)/(top - bottom)},
-			{0,0,2/(near - far),-(near + far)/(near - far)},
+			{2/(right - left),0,0,(-(right + left))/(right - left)},
+			{0,2/(top - bottom),0,(-(top + bottom))/(top - bottom)},
+			{0,0,2/(near - far),(-(near + far))/(far - near)},
 			{0,0,0,1}
 		};
 
@@ -540,7 +540,7 @@ Matrix4 MakeProjectionTransformation(Camera *camera)
 		double perspectiveMatrix[4][4] = {
 			{2*near/(right - left),0,(right + left)/(right - left),0},
 			{0,2*near/(top - bottom),(top + bottom)/(top - bottom),0},
-			{0,0,-(far + near)/(far - near),-2*far*near/(far - near)},
+			{0,0,(-(far + near))/(far - near),(-2*far*near)/(far - near)},
 			{0,0,-1,0}
 		};
 
@@ -560,7 +560,7 @@ Matrix4 MakeViewportTransformation(Camera *camera)
 	// matrix formula of Mvp
 	// n_x/2 0 0 (n_x-1)/2 + xmin
 	// 0 n_y/2 0 (n_y-1)/2 + ymin
-	// 0 0 1 0.5
+	// 0 0 0.5 0.5
 	double viewportMatrix[4][4] = {
 		{horRes*0.5,0,0,(horRes-1)*0.5},
 		{0,verRes*0.5,0,(verRes-1)*0.5},
@@ -645,14 +645,13 @@ bool clippingLiangBarsky(Color& c1, Color& c2,Vec4& p1, Vec4& p2, double xmin, d
 							}
 							visible = true;
 						}
-					}
-				
+					}			
 				}
 			}
 		}
 
 	}
-	std::cout << "cComp: " << cComp << std::endl;
+	// std::cout << "cComp: " << cComp << std::endl;
 
 	// to avoid memory leak
 	delete cComp;
@@ -679,49 +678,6 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 }
 
-/* void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
-	// line rasterization algorithm is given in the slides
-	// algorithm with color interpolation 
-
-	double y = p1.y;
-	double d = 2*(p1.y - p2.y) + (p2.x - p1.x); // initial d valueused 2* to eliminate the floating point point operations
-
-	Color c = c1; // initial color
-	Color* dc = new Color(); // color component
-
-	// not sure if its correct
-	dc->r = (c2.r - c1.r)/(p2.x - p1.x); // color component for r
-	dc->g = (c2.g - c1.g)/(p2.x - p1.x); // color component for g
-	dc->b = (c2.b - c1.b)/(p2.x - p1.x); // color component for b
-
-	// i should also check if the slope is greater than 1 or not
-
-	for(int x=p1.x;x <=p2.x;x++){
-		// draw(x,y,round(c))
-		if(x >= 0 && x < image.size() && y >= 0 && y < image[0].size()){
-			if(depth[x][y] > p1.z){ // depth buffer check
-				
-				// image[x][y] = c; 
-				image[x][y].r = round(c.r); image[x][y].g = round(c.g); image[x][y].b = round(c.b); //Q: should i cast to int??
-
-				depth[x][y] = p1.z; // depth buffer update
-			}
-		}
-		if(d < 0){ // choose NE
-			y = y + 1;
-			d = d + 2*((p1.y - p2.y) + (p2.x - p1.x)); // to avoid floating point operations
-		}
-		else{ //Choose E
-			d = d + 2*(p1.y - p2.y); // to avoid floating point operations
-		}
-		c.r = c.r + dc->r; c.g = c.g + dc->g; c.b = c.b + dc->b;
-	}
-
-	// to avoid memory leak
-	delete dc;
-}
- */
-
 // line rasterization function with slope greater than 1 is included
 void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
     // Check if the slope of the line is steep (greater than 1)
@@ -739,18 +695,20 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
         std::swap(c1, c2);
     }
 
-    double dx = p2.x - p1.x;
-    double dy = std::abs(p2.y - p1.y);
-    double d = 2 * dy - dx; // Adjusted for slope slope
+    double dx = p2.x - p1.x; // x1-x0
+    double dy = p1.y - p2.y; // should it be  y0-y1 ??
+    double d = 2 * dy + dx; // Adjusted for slope slope
     double yStep = (p2.y - p1.y) > 0 ? 1 : -1;
-    double y = p1.y;
+    int y = p1.y;
 
     Color c = c1;
     Color* dc = new Color();
-	dc->r = (c2.r - c1.r) / dx;
+
+	/* dc->r = (c2.r - c1.r) / dx;
 	dc->g = (c2.g - c1.g) / dx;
-	dc->b = (c2.b - c1.b) / dx;
-    /* if (slope) {
+	dc->b = (c2.b - c1.b) / dx; */
+
+    if (slope) {
         // Adjust color step for slope slope
 		// if slope is going up divide to dy but didnt we already swapped the values??
         dc->r = (c2.r - c1.r) / dy;
@@ -761,7 +719,7 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
         dc->r = (c2.r - c1.r) / dx;
         dc->g = (c2.g - c1.g) / dx;
         dc->b = (c2.b - c1.b) / dx;
-    } */
+    }
 
     for (int x = p1.x; x <= p2.x; x++) {
         if (slope) {
@@ -900,6 +858,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			// culling will be done here if it is enabled
 			if(this->cullingEnabled){
 				bool notVisible = checkBackfaceCulling(v1_4, v2_4, v3_4); // returns true if its backfaced
+				// std::cout << "notVisible: " << notVisible << std::endl;
 				if(notVisible){
 					continue;
 				}
@@ -909,28 +868,39 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			// NOTE: Clipping will be applied for only Wireframe mode
 			// type=0 for wireframe, type=1 for solid
 			if(mesh->type == WIREFRAME_MESH){
-				;
+				
+				// now perspective division will be done here
+				perspectiveDivide(v1_4.x, v1_4.y, v1_4.z, v1_4.t);
+				perspectiveDivide(v2_4.x, v2_4.y, v2_4.z, v2_4.t);
+				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
+
+				Vec4 v1_4_copy = v1_4;
+				Vec4 v2_4_copy = v2_4;
+				Vec4 v3_4_copy = v3_4;
+
 				// clipping algorithm: liang-barsky
 				// returns true if line is visible
 				// returns false if line is invisible
 				// two edges (v1,v2), (v2,v3), (v3,v1)
-				bool visibleLine1 = clippingLiangBarsky(*c1,*c2,v1_4, v2_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far); 
-				bool visibleLine2 = clippingLiangBarsky(*c2,*c3,v2_4, v3_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
-				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4, v1_4, camera->left, camera->right, camera->bottom, camera->top, camera->near, camera->far);
+				bool visibleLine1 = clippingLiangBarsky(*c1,*c2,v1_4, v2_4, -1, 1, -1, 1, -1, 1);
+				// std::cout << "visibleLine1: " << visibleLine1 << std::endl;
 
-				// now perspective division will be done here
-				/* v1_4.x = v1_4.x/v1_4.t; v1_4.y = v1_4.y/v1_4.t; v1_4.z = v1_4.z/v1_4.t; // first vertex division by the t component
-				v2_4.x = v2_4.x/v2_4.t; v2_4.y = v2_4.y/v2_4.t; v2_4.z = v2_4.z/v2_4.t; // second vertex division by the t component
-				v3_4.x = v3_4.x/v3_4.t; v3_4.y = v3_4.y/v3_4.t; v3_4.z = v3_4.z/v3_4.t; // third vertex division by the t component
- */
-				perspectiveDivide(v1_4.x, v1_4.y, v1_4.z, v1_4.t);
-				perspectiveDivide(v2_4.x, v2_4.y, v2_4.z, v2_4.t);
-				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
+				bool visibleLine2 = clippingLiangBarsky(*c2,*c3,v2_4_copy, v3_4, -1, 1, -1, 1, -1, 1);
+				// std::cout << "visibleLine2: " << visibleLine2 << std::endl;
+				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4_copy, v1_4_copy, -1, 1, -1, 1, -1, 1);
+				// std::cout << "visibleLine3: " << visibleLine3 << std::endl;
+
+				
 
 				// now viewport transformation will be done here
 				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
 				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
 				v3_4 = multiplyMatrixWithVec4(ViewportMatrix, v3_4);
+
+				v1_4_copy = multiplyMatrixWithVec4(ViewportMatrix, v1_4_copy);
+				v2_4_copy = multiplyMatrixWithVec4(ViewportMatrix, v2_4_copy);
+				v3_4_copy = multiplyMatrixWithVec4(ViewportMatrix, v3_4_copy);
+
 
 				// now rasterization will be done here
 				if(visibleLine1){
@@ -939,11 +909,11 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				}
 				if(visibleLine2){
 					// lineRasterization function
-					lineRasterizationFunc(v2_4, v3_4, *c2, *c3, this->image, this->depth);
+					lineRasterizationFunc(v2_4_copy, v3_4, *c2, *c3, this->image, this->depth);
 				}
 				if(visibleLine3){
 					// lineRasterization function
-					lineRasterizationFunc(v3_4, v1_4, *c3, *c1, this->image, this->depth);
+					lineRasterizationFunc(v3_4_copy, v1_4_copy, *c3, *c1, this->image, this->depth);
 				}
 
 			}
@@ -965,8 +935,8 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			}
 
 			// avoid memory leak
-			delete v1; delete v2; delete v3;
-			delete c1; delete c2; delete c3;
+			// delete v1; delete v2; delete v3;
+			// delete c1; delete c2; delete c3;
 
 		}
 
