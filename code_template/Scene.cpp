@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 #include <cmath>
+#include <iostream>
 
 #include "tinyxml2.h"
 #include "Triangle.h"
@@ -651,6 +652,7 @@ bool clippingLiangBarsky(Color& c1, Color& c2,Vec4& p1, Vec4& p2, double xmin, d
 		}
 
 	}
+	std::cout << "cComp: " << cComp << std::endl;
 
 	// to avoid memory leak
 	delete cComp;
@@ -820,7 +822,7 @@ void triangleRasterizationFunc(Vec4& p0, Vec4& p1, Vec4& p2, Color& c1, Color& c
 
 			if(alpha >= 0 && beta >= 0 && gamma >= 0){
 				double z = alpha*p0.z + beta*p1.z + gamma*p2.z;
-				if(z < depth[x][y]){
+				if(z < depth[x][y] & y >= 0 && y < image.size() && x >= 0 && x < image[0].size()){
 					depth[x][y] = z;
 					image[x][y].r = round(alpha*c1.r + beta*c2.r + gamma*c3.r);
 					image[x][y].g = round(alpha*c1.g + beta*c2.g + gamma*c3.g);
@@ -907,6 +909,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			// NOTE: Clipping will be applied for only Wireframe mode
 			// type=0 for wireframe, type=1 for solid
 			if(mesh->type == WIREFRAME_MESH){
+				;
 				// clipping algorithm: liang-barsky
 				// returns true if line is visible
 				// returns false if line is invisible
@@ -961,7 +964,12 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 
 			}
 
+			// avoid memory leak
+			delete v1; delete v2; delete v3;
+			delete c1; delete c2; delete c3;
+
 		}
 
 	}
+
 }
