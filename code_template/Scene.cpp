@@ -13,6 +13,12 @@
 #include "Helpers.h"
 #include "Scene.h"
 
+// Include the appropriate headers based on the operating system
+#ifdef _WIN32
+    #include <direct.h> // For _mkdir on Windows
+#else
+    #include <sys/stat.h> // For mkdir on Unix-like systems
+#endif
 
 using namespace tinyxml2;
 using namespace std;
@@ -679,7 +685,7 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 }
 
 // line rasterization function with slope greater than 1 is included
-void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
+/*  void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
     // Check if the slope of the line is steep (greater than 1)
     bool slope = std::abs(p2.y - p1.y) > std::abs(p2.x - p1.x); // slope = y2 - y1 > x2 - x1
 
@@ -703,10 +709,6 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 
     Color c = c1;
     Color* dc = new Color();
-
-	/* dc->r = (c2.r - c1.r) / dx;
-	dc->g = (c2.g - c1.g) / dx;
-	dc->b = (c2.b - c1.b) / dx; */
 
     if (slope) {
         // Adjust color step for slope slope
@@ -752,6 +754,205 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
     }
 
     delete dc;
+} */
+
+void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
+    double dx = p2.x - p1.x; // x1-x0
+	double dy = p2.y - p1.y; // should it be  y0-y1 ??
+	int d; 
+	int increment = 1;
+	Color dc,c;
+
+	if(std::abs(dy) <= std::abs(dx)){ // slope is less than 1
+		if(p2.x < p1.x){ // if x2 < x1
+			std::swap(p1,p2);
+			std::swap(c1,c2);
+		}
+		if(p2.y < p1.y){ // if y2 < y1
+			increment = -1;
+		}
+		int y = p1.y;
+		c = c1;
+		d = (p1.y - p2.y) +(increment * (p2.x - p1.x)*0.5);
+		dc.r = (c2.r - c1.r) / (p2.x - p1.x);
+		dc.g = (c2.g - c1.g) / (p2.x-p1.x);
+		dc.b = (c2.b - c1.b) / (p2.x-p1.x);
+
+		for(int x = p1.x; x <= p2.x; x++){
+			if(depth[x][y] > p1.z){
+				image[x][y].r = (round(c.r));
+				image[x][y].g = (round(c.g));
+				image[x][y].b = (round(c.b));
+				depth[x][y] = p1.z;
+			}
+			if(d*increment < 0){
+				y += increment;
+				d += (p1.y - p2.y) + (increment * (p2.x - p1.x));
+			}
+			else{
+				d += (p1.y - p2.y);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+		}
+
+	}
+	else if(std::abs(dy)>std::abs(dx)){
+		if(p2.y < p1.y){ // if y2 < y1
+			std::swap(p1,p2);
+			std::swap(c1,c2);
+		}
+		if(p2.x < p1.x){ // if x2 < x1
+			increment = -1;
+		}
+		int x = p1.x;
+		c = c1;
+		d = (p2.x - p1.x) +(increment * (p1.y - p2.y)*0.5);
+		dc.r = (c2.r - c1.r) / (p2.y - p1.y);
+		dc.g = (c2.g - c1.g) / (p2.y-p1.y);
+		dc.b = (c2.b - c1.b) / (p2.y-p1.y);
+
+		for(int y = p1.y; y <= p1.y; y++){
+			if(depth[x][y] > p1.z){
+				image[x][y].r = (round(c.r));
+				image[x][y].g = (round(c.g));
+				image[x][y].b = (round(c.b));
+				depth[x][y] = p1.z;
+			}
+			if(d*increment > 0){
+				x += increment;
+				d += (p2.x - p1.x) + (increment * (p1.y - p2.y));
+			}
+			else{
+				d += (p2.x - p1.x);
+			}
+			c.r += dc.r;
+			c.g += dc.g;
+			c.b += dc.b;
+		}
+
+	}
+
+}
+
+void lineRasterizationFunc2(Vec4& p1, Vec4& p2, Color& c1, Color& c2,  std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth ){
+	double y = p1.y;
+	
+	double d = (p1.y - p2.y) + ((p2.x - p1.x)*0.5);
+
+	Color* c = new Color(); 
+	c->r = c1.r; c->g = c1.g; c->b = c1.b;
+	Color* dc = new Color();
+	dc->r = (c2.r - c1.r) / (p2.x - p1.x);
+	dc->g = (c2.g - c1.g) / (p2.x - p1.x);
+	dc->b = (c2.b - c1.b) / (p2.x - p1.x);
+
+	double slope = (p2.y - p1.y) / (p2.x - p1.x);
+
+
+	if(slope >= 0 && slope < 1){
+		// normal midpoint algorithm with color interpolation
+		for(int x = p1.x; x <= p2.x; x++){
+			if(depth[x][y] > p1.z){
+				image[x][y].r = (round(c->r));
+				image[x][y].g = (round(c->g));
+				image[x][y].b = (round(c->b));
+				depth[x][y] = p1.z;
+			}
+			if(d < 0){
+				y += 1;
+				d += (p1.y - p2.y) + (p2.x - p1.x);
+			}
+			else{
+				d += (p1.y - p2.y);
+			}
+			c->r += dc->r;
+			c->g += dc->g;
+			c->b += dc->b;
+		}
+	}
+
+	if(slope >= 1 ){
+		// swap x and y
+		double temp = p1.x;
+		p1.x = p1.y;
+		p1.y = temp;
+		temp = p2.x;
+		p2.x = p2.y;
+		p2.y = temp;
+
+		// normal midpoint algorithm with color interpolation
+		for(int x = p1.x; x <= p2.x; x++){
+			if(depth[y][x] > p1.z){
+				image[y][x].r = (round(c->r));
+				image[y][x].g = (round(c->g));
+				image[y][x].b = (round(c->b));
+				depth[y][x] = p1.z;
+			}
+			if(d < 0){
+				y += 1;
+				d += (p1.y - p2.y) + (p2.x - p1.x);
+			}
+			else{
+				d += (p1.y - p2.y);
+			}
+			c->r += dc->r;
+			c->g += dc->g;
+			c->b += dc->b;
+		}
+	}
+	if(slope <0 && slope > -1){
+		// normal midpoint algorithm with color interpolation
+		for(int x = p1.x; x <= p2.x; x++){
+			if(depth[x][y] > p1.z){
+				image[x][y].r = (round(c->r));
+				image[x][y].g = (round(c->g));
+				image[x][y].b = (round(c->b));
+				depth[x][y] = p1.z;
+			}
+			if(d > 0){
+				y -= 1;
+				d += (p1.y - p2.y) + (p2.x - p1.x);
+			}
+			else{
+				d += (p1.y - p2.y);
+			}
+			c->r += dc->r;
+			c->g += dc->g;
+			c->b += dc->b;
+		}
+	}
+	if(slope <= -1 ){
+		// swap x and y
+		double temp = p1.x;
+		p1.x = p1.y;
+		p1.y = temp;
+		temp = p2.x;
+		p2.x = p2.y;
+		p2.y = temp;
+
+		// normal midpoint algorithm with color interpolation
+		for(int x = p1.x; x <= p2.x; x++){
+			if(depth[y][x] > p1.z){
+				image[y][x].r = (round(c->r));
+				image[y][x].g = (round(c->g));
+				image[y][x].b = (round(c->b));
+				depth[y][x] = p1.z;
+			}
+			if(d > 0){
+				y -= 1;
+				d += (p1.y - p2.y) + (p2.x - p1.x);
+			}
+			else{
+				d += (p1.y - p2.y);
+			}
+			c->r += dc->r;
+			c->g += dc->g;
+			c->b += dc->b;
+		}
+	}
+
 }
 
 double f_xy(double x, double y, double x0, double y0, double x1, double y1) {
@@ -815,6 +1016,7 @@ void perspectiveDivide(double &x, double &y, double &z, double &t) {
 /*
 	Transformations, clipping, culling, rasterization are done here.
 */
+
 void Scene::forwardRenderingPipeline(Camera *camera)
 {
 	// TODO: Implement this function
@@ -878,19 +1080,28 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				Vec4 v2_4_copy = v2_4;
 				Vec4 v3_4_copy = v3_4;
 
+				Color* c1_copy = new Color(); Color* c2_copy = new Color(); Color* c3_copy = new Color();
+				c1_copy->r = c1->r; c1_copy->g = c1->g; c1_copy->b = c1->b;
+				c2_copy->r = c2->r; c2_copy->g = c2->g; c2_copy->b = c2->b;
+				c3_copy->r = c3->r; c3_copy->g = c3->g; c3_copy->b = c3->b;
+
+				Color* c1_copy_2 = new Color(); Color* c2_copy_2 = new Color(); Color* c3_copy_2 = new Color();
+				c1_copy_2->r = c1->r; c1_copy_2->g = c1->g; c1_copy_2->b = c1->b;
+				c2_copy_2->r = c2->r; c2_copy_2->g = c2->g; c2_copy_2->b = c2->b;
+				c3_copy_2->r = c3->r; c3_copy_2->g = c3->g; c3_copy_2->b = c3->b;
+
+
 				// clipping algorithm: liang-barsky
 				// returns true if line is visible
 				// returns false if line is invisible
 				// two edges (v1,v2), (v2,v3), (v3,v1)
-				bool visibleLine1 = clippingLiangBarsky(*c1,*c2,v1_4, v2_4, -1, 1, -1, 1, -1, 1);
+				bool visibleLine1 = clippingLiangBarsky(*c1_copy,*c2_copy, v1_4, v2_4, -1, 1, -1, 1, -1, 1);
 				// std::cout << "visibleLine1: " << visibleLine1 << std::endl;
 
-				bool visibleLine2 = clippingLiangBarsky(*c2,*c3,v2_4_copy, v3_4, -1, 1, -1, 1, -1, 1);
+				bool visibleLine2 = clippingLiangBarsky(*c2_copy_2,*c3, v2_4_copy, v3_4, -1, 1, -1, 1, -1, 1);
 				// std::cout << "visibleLine2: " << visibleLine2 << std::endl;
-				bool visibleLine3 = clippingLiangBarsky(*c3,*c1,v3_4_copy, v1_4_copy, -1, 1, -1, 1, -1, 1);
+				bool visibleLine3 = clippingLiangBarsky(*c3_copy_2,*c1_copy_2, v3_4_copy, v1_4_copy, -1, 1, -1, 1, -1, 1);
 				// std::cout << "visibleLine3: " << visibleLine3 << std::endl;
-
-				
 
 				// now viewport transformation will be done here
 				v1_4 = multiplyMatrixWithVec4(ViewportMatrix, v1_4);
@@ -915,6 +1126,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 					// lineRasterization function
 					lineRasterizationFunc(v3_4_copy, v1_4_copy, *c3, *c1, this->image, this->depth);
 				}
+
+				// avoid memory leak
+				delete c1_copy; delete c2_copy; delete c3_copy;
+				delete c1_copy_2; delete c2_copy_2; delete c3_copy_2;
 
 			}
 			else{
