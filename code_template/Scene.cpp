@@ -771,28 +771,39 @@ double f_xy(double x, double y, double x0, double y0, double x1, double y1) {
 }
 
 
-void triangleRasterizationFunc(Vec4& p0, Vec4& p1, Vec4& p2, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth){
+void triangleRasterizationFunc(Vec4& p0, Vec4& p1, Vec4& p2, Color& c1, Color& c2, Color& c3, std::vector<std::vector<Color> >& image, std::vector<std::vector<double> >& depth, int nx, int ny){
 	// triangle rasterization algorithm is given in the slides
+	// check according to nx and ny
+
+	int x_min = std::min(std::min(p0.x, p1.x), p2.x);
+	x_min = std::max(x_min, 0); // Ensure x_min is not less than 0
+
+	int x_max = std::max(std::max(p0.x, p1.x), p2.x);
+	x_max = std::min(x_max, nx - 1); // Ensure x_max is not greater than nx-1
 
 	int y_min = std::min(std::min(p0.y, p1.y), p2.y);
+	y_min = std::max(y_min, 0); // Ensure y_min is not less than 0
+
 	int y_max = std::max(std::max(p0.y, p1.y), p2.y);
-	int x_min = std::min(std::min(p0.x, p1.x), p2.x);
-	int x_max = std::max(std::max(p0.x, p1.x), p2.x);
+	y_max = std::min(y_max, ny - 1); // Ensure y_max is not greater than ny-1
 
 	double f01 = f_xy(p2.x, p2.y, p0.x, p0.y, p1.x, p1.y);
 	double f12 = f_xy(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
 	double f20 = f_xy(p1.x, p1.y, p2.x, p2.y, p0.x, p0.y);
 
+	int hor_limit = nx - 1;
+	int ver_limit = ny - 1;
 
-	for(int y=y_min; y<y_max;y++){
-		for(int x=x_min;x<x_max;x++){
-			double alpha = f_xy(x,y,p1.x,p1.y,p2.x,p2.y)/f01;
-			double beta = f_xy(x,y,p2.x,p2.y,p0.x,p0.y)/f12;
-			double gamma = f_xy(x,y,p0.x,p0.y,p1.x,p1.y)/f20;
+
+	for(int y=y_min; y<= y_max;y++){
+		for(int x=x_min; x<= x_max;x++){
+			double alpha = f_xy(x,y,p1.x,p1.y,p2.x,p2.y)/f12;
+			double beta = f_xy(x,y,p2.x,p2.y,p0.x,p0.y)/f20;
+			double gamma = f_xy(x,y,p0.x,p0.y,p1.x,p1.y)/f01;
 
 			if(alpha >= 0 && beta >= 0 && gamma >= 0){
 				double z = alpha*p0.z + beta*p1.z + gamma*p2.z;
-				if(z < depth[x][y] & y >= 0 && y < image.size() && x >= 0 && x < image[0].size()){
+				if(z < depth[x][y] && y >= 0 && y <= ver_limit  && x >= 0 && x < hor_limit){
 					depth[x][y] = z;
 					image[x][y].r = round(alpha*c1.r + beta*c2.r + gamma*c3.r);
 					image[x][y].g = round(alpha*c1.g + beta*c2.g + gamma*c3.g);
@@ -890,7 +901,7 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
 
 				Vec4 v1_4_copy = v1_4;
-				Vec4 v2_4_copy =v2_4;
+				Vec4 v2_4_copy = v2_4;
 				Vec4 v3_4_copy =v3_4;
 
 				// is it right??
@@ -958,8 +969,16 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				v2_4 = multiplyMatrixWithVec4(ViewportMatrix, v2_4);
 				v3_4 = multiplyMatrixWithVec4(ViewportMatrix, v3_4);
 
+				Color* c1_copy = new Color(); Color* c2_copy = new Color(); Color* c3_copy = new Color();
+				c1_copy->r = c1->r; c1_copy->g = c1->g; c1_copy->b = c1->b;
+				c2_copy->r = c2->r; c2_copy->g = c2->g; c2_copy->b = c2->b;
+				c3_copy->r = c3->r; c3_copy->g = c3->g; c3_copy->b = c3->b;
+
 				// now rasterization will be done here
-				triangleRasterizationFunc(v1_4, v2_4, v3_4, *c1, *c2, *c3, this->image, this->depth);
+				triangleRasterizationFunc(v1_4, v2_4, v3_4, *c1_copy, *c2_copy, *c3_copy, this->image, this->depth, camera->horRes, camera->verRes);
+				// avoid memory leak
+				delete c1_copy; delete c2_copy; delete c3_copy;
+
 
 			}
 
