@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <iostream>
 #include "Rotation.h"
 
 Rotation::Rotation() {

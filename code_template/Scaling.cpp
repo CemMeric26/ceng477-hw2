@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <iostream>
 #include "Scaling.h"
 
 Scaling::Scaling() {

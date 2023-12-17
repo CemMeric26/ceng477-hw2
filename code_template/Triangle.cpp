@@ -1,4 +1,5 @@
 #include <iomanip>
+#include <iostream>
 #include "Triangle.h"
 
 Triangle::Triangle()
