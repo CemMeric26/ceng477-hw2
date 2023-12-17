@@ -681,84 +681,88 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 }
 
 
-void lineRasterizationFunc_2condition(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
+// Helper Functions to update color
+void updateColor(Color& color, const Color& colorStep) {
+    color.r += colorStep.r;
+    color.g += colorStep.g;
+    color.b += colorStep.b;
+}
+
+// Helper function to calculate color difference.
+Color calculateColorDifference(const Color& c1, const Color& c2, double divisor) {
+    return { (c2.r - c1.r) / divisor, (c2.g - c1.g) / divisor, (c2.b - c1.b) / divisor };
+}
+
+void rasterizeLine(Vec4& p1, Vec4& p2,int y,  Color& initialColor,  Color& dc,
+                   std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth, int d, int yIncrement) {
+    Color color = initialColor;
+    for (int x = p1.x; x <= p2.x;x++) {
+        if (depth[x][y] > p1.z) {
+            image[x][y] = color;
+            depth[x][y] = p1.z;
+        }
+		if(d * yIncrement < 0){
+			y += yIncrement;
+			d += (p1.y - p2.y) + (yIncrement * (p2.x - p1.x));
+		}
+		else{
+			d += (p1.y - p2.y);
+		}
+
+        updateColor(color, dc);
+    
+	}
+}
+
+void rasterizeLine2(Vec4& p1, Vec4& p2, int x, const Color& initialColor, const Color& dc,
+						std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth,int d, int xIncrement) {
+    
+	Color color = initialColor;
+    for (int y = p1.y; y <= p2.y; y++) {
+		if (depth[x][y] > p1.z) {
+			image[x][y] = color;
+			depth[x][y] = p1.z;
+		}
+		if(d*xIncrement > 0){
+			x += xIncrement;
+			d += (p2.x - p1.x) + (xIncrement * (p1.y - p2.y));
+		}
+		else{
+			d += (p2.x - p1.x);
+		}
+		updateColor(color, dc);
+	}
+}
+
+// Main function line rasterization function
+void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
     double dx = p2.x - p1.x; // x1-x0
-	double dy = p2.y - p1.y; // should it be  y0-y1 ??
-	int d; 
-	int increment = 1;
-	Color dc,c;
+    double dy = p2.y - p1.y; // y1-y0
 
-	if(std::abs(dy) <= std::abs(dx)){ // slope is less than 1
-		if(p2.x < p1.x){ // if x2 < x1
-			std::swap(p1,p2);
-			std::swap(c1,c2);
-		}
-		if(p2.y < p1.y){ // if y2 < y1
-			increment = -1;
-		}
-		int y = p1.y;
-		c = c1;
-		d = (p1.y - p2.y) + (increment * (p2.x - p1.x)*0.5);
-		dc.r = (c2.r - c1.r) / (p2.x - p1.x);
-		dc.g = (c2.g - c1.g) / (p2.x-p1.x);
-		dc.b = (c2.b - c1.b) / (p2.x-p1.x);
+    if (std::abs(dy) <= std::abs(dx)) { // slope is less than 1
+        if (p2.x < p1.x) { // if x2 < x1
+            std::swap(p1, p2);
+            std::swap(c1, c2);
+        }
+        int yIncrement = (p2.y < p1.y) ? -1 : 1; // if y2 < y1
+        int y = p1.y;
+		int d = (p1.y - p2.y) + (yIncrement * (p2.x - p1.x)*0.5);
 
-		for(int x = p1.x; x <= p2.x; x++){
-			if(depth[x][y] > p1.z){
-				image[x][y].r = (round(c.r));
-				image[x][y].g = (round(c.g));
-				image[x][y].b = (round(c.b));
-				depth[x][y] = p1.z;
-			}
-			if(d * increment < 0){
-				y += increment;
-				d += (p1.y - p2.y) + (increment * (p2.x - p1.x));
-			}
-			else{
-				d += (p1.y - p2.y);
-			}
-			c.r += dc.r;
-			c.g += dc.g;
-			c.b += dc.b;
-		}
+        Color dc = calculateColorDifference(c1, c2, p2.x - p1.x);
 
-	}
-	else if(std::abs(dy)>std::abs(dx)){
-		if(p2.y < p1.y){ // if y2 < y1
-			std::swap(p1,p2);
-			std::swap(c1,c2);
-		}
-		if(p2.x < p1.x){ // if x2 < x1
-			increment = -1;
-		}
-		int x = p1.x;
-		c = c1;
-		d = (p2.x - p1.x) +(increment * (p1.y - p2.y)*0.5);
-		dc.r = (c2.r - c1.r) / (p2.y - p1.y);
-		dc.g = (c2.g - c1.g) / (p2.y-p1.y);
-		dc.b = (c2.b - c1.b) / (p2.y-p1.y);
+        rasterizeLine(p1, p2, y, c1, dc, image, depth, d, yIncrement);
+    } else if(std::abs(dy)>std::abs(dx)) {
+        if (p2.y < p1.y) { // if y2 < y1
+            std::swap(p1, p2);
+            std::swap(c1, c2);
+        }
+        int xIncrement = (p2.x < p1.x) ? -1 : 1; // if x2 < x1
+        int x = p1.x; 
+		int d = (p2.x - p1.x) + (xIncrement * (p1.y - p2.y)*0.5);
+        Color dc = calculateColorDifference(c1, c2, p2.y - p1.y);
 
-		for(int y = p1.y; y <= p2.y; y++){
-			if(depth[x][y] > p1.z){
-				image[x][y].r = (round(c.r));
-				image[x][y].g = (round(c.g));
-				image[x][y].b = (round(c.b));
-				depth[x][y] = p1.z;
-			}
-			if(d*increment > 0){
-				x += increment;
-				d += (p2.x - p1.x) + (increment * (p1.y - p2.y));
-			}
-			else{
-				d += (p2.x - p1.x);
-			}
-			c.r += dc.r;
-			c.g += dc.g;
-			c.b += dc.b;
-		}
-
-	}
-
+        rasterizeLine2(p1, p2, x, c1, dc, image, depth, d, xIncrement);
+    }
 }
 
 
@@ -926,15 +930,15 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// now rasterization will be done here
 				if(visibleLine1){
 					// lineRasterization function
-					lineRasterizationFunc_2condition(v1_4, v2_4, *c1_copy, *c2_copy, this->image, this->depth);
+					lineRasterizationFunc(v1_4, v2_4, *c1_copy, *c2_copy, this->image, this->depth);
 				}
 				if(visibleLine2){
 					// lineRasterization function
-					lineRasterizationFunc_2condition(v2_4_copy, v3_4, *c2_copy_2, *c3_copy, this->image, this->depth);
+					lineRasterizationFunc(v2_4_copy, v3_4, *c2_copy_2, *c3_copy, this->image, this->depth);
 				}
 				if(visibleLine3){
 					// lineRasterization function
-					lineRasterizationFunc_2condition(v3_4_copy, v1_4_copy, *c3_copy_2, *c1_copy_2, this->image, this->depth);
+					lineRasterizationFunc(v3_4_copy, v1_4_copy, *c3_copy_2, *c1_copy_2, this->image, this->depth);
 				}
 
 				// avoid memory leak
