@@ -616,8 +616,8 @@ bool clippingLiangBarsky(Color& c1, Color& c2,Vec4& p1, Vec4& p2, double xmin, d
 	// You should interpolate the colors for the new vertices. 
 	// You need to calculate the new color based on the distances 
 	// to the original vertices.
-	double t_e = 0;
-	double t_l = 1;
+	double t_e = 0.0;
+	double t_l = 1.0;
 	double dx = p2.x - p1.x;
 	double dy = p2.y - p1.y;
 	double dz = p2.z - p1.z;
@@ -672,91 +672,16 @@ bool checkBackfaceCulling(Vec4& p1, Vec4& p2, Vec4& p3){
 
 	Vec3 normal = normalizeVec3(crossProductVec3(v1,v2)); // normal = v1 x v2
 	Vec3 view = {p1.x,p1.y,p1.z}; // is this true for view vector = view = p1 - origin
+	Vec3 normal_view = normalizeVec3(view); // normalize view vector
 
-	double dotProduct = dotProductVec3(normal, view);
+	double dotProduct = dotProductVec3(normal, normal_view);
 
-	if(dotProduct > 0){
-		return true; // this means that the triangle is not visible
-	}
-	else{
-		return false;
-	}
+	return dotProduct < 0; // return true if the triangle is facing away from the camera
 
 }
 
-// line rasterization function with slope greater than 1 is included
-/*  void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
-    // Check if the slope of the line is steep (greater than 1)
-    bool slope = std::abs(p2.y - p1.y) > std::abs(p2.x - p1.x); // slope = y2 - y1 > x2 - x1
 
-    if (slope) {
-        // Swap x and y coordinates for both points
-        std::swap(p1.x, p1.y);
-        std::swap(p2.x, p2.y);
-    }
-
-    // Ensure that we always draw from left to right
-    if (p1.x > p2.x) {
-        std::swap(p1, p2);
-        std::swap(c1, c2);
-    }
-
-    double dx = p2.x - p1.x; // x1-x0
-    double dy = p1.y - p2.y; // should it be  y0-y1 ??
-    double d = 2 * dy + dx; // Adjusted for slope slope
-    double yStep = (p2.y - p1.y) > 0 ? 1 : -1;
-    int y = p1.y;
-
-    Color c = c1;
-    Color* dc = new Color();
-
-    if (slope) {
-        // Adjust color step for slope slope
-		// if slope is going up divide to dy but didnt we already swapped the values??
-        dc->r = (c2.r - c1.r) / dy;
-        dc->g = (c2.g - c1.g) / dy;
-        dc->b = (c2.b - c1.b) / dy;
-    } else {
-		// if slope is going up divide to dx
-        dc->r = (c2.r - c1.r) / dx;
-        dc->g = (c2.g - c1.g) / dx;
-        dc->b = (c2.b - c1.b) / dx;
-    }
-
-    for (int x = p1.x; x <= p2.x; x++) {
-        if (slope) {
-            // Swap x and y when drawing for slope lines
-            if (y >= 0 && y < image.size() && x >= 0 && x < image[0].size() && depth[y][x] > p1.z) {
-                image[y][x].r = (round(c.r));
-                image[y][x].g = (round(c.g));
-                image[y][x].b = (round(c.b));
-                depth[y][x] = p1.z;
-            }
-        } else {
-            if (x >= 0 && x < image.size() && y >= 0 && y < image[0].size() && depth[x][y] > p1.z) {
-                image[x][y].r = (round(c.r));
-                image[x][y].g = (round(c.g));
-                image[x][y].b = (round(c.b));
-                depth[x][y] = p1.z;
-            }
-        }
-
-        if (d < 0) {
-            y += yStep;
-            d += 2 * (dy + dx);
-        } else {
-            d += 2 * dy;
-        }
-
-        c.r += dc->r;
-        c.g += dc->g;
-        c.b += dc->b;
-    }
-
-    delete dc;
-} */
-
-void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
+void lineRasterizationFunc_2condition(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth) {
     double dx = p2.x - p1.x; // x1-x0
 	double dy = p2.y - p1.y; // should it be  y0-y1 ??
 	int d; 
@@ -773,7 +698,7 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 		}
 		int y = p1.y;
 		c = c1;
-		d = (p1.y - p2.y) +(increment * (p2.x - p1.x)*0.5);
+		d = (p1.y - p2.y) + (increment * (p2.x - p1.x)*0.5);
 		dc.r = (c2.r - c1.r) / (p2.x - p1.x);
 		dc.g = (c2.g - c1.g) / (p2.x-p1.x);
 		dc.b = (c2.b - c1.b) / (p2.x-p1.x);
@@ -785,7 +710,7 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 				image[x][y].b = (round(c.b));
 				depth[x][y] = p1.z;
 			}
-			if(d*increment < 0){
+			if(d * increment < 0){
 				y += increment;
 				d += (p1.y - p2.y) + (increment * (p2.x - p1.x));
 			}
@@ -813,7 +738,7 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 		dc.g = (c2.g - c1.g) / (p2.y-p1.y);
 		dc.b = (c2.b - c1.b) / (p2.y-p1.y);
 
-		for(int y = p1.y; y <= p1.y; y++){
+		for(int y = p1.y; y <= p2.y; y++){
 			if(depth[x][y] > p1.z){
 				image[x][y].r = (round(c.r));
 				image[x][y].g = (round(c.g));
@@ -836,124 +761,6 @@ void lineRasterizationFunc(Vec4& p1, Vec4& p2, Color& c1, Color& c2, std::vector
 
 }
 
-void lineRasterizationFunc2(Vec4& p1, Vec4& p2, Color& c1, Color& c2,  std::vector<std::vector<Color>>& image, std::vector<std::vector<double>>& depth ){
-	double y = p1.y;
-	
-	double d = (p1.y - p2.y) + ((p2.x - p1.x)*0.5);
-
-	Color* c = new Color(); 
-	c->r = c1.r; c->g = c1.g; c->b = c1.b;
-	Color* dc = new Color();
-	dc->r = (c2.r - c1.r) / (p2.x - p1.x);
-	dc->g = (c2.g - c1.g) / (p2.x - p1.x);
-	dc->b = (c2.b - c1.b) / (p2.x - p1.x);
-
-	double slope = (p2.y - p1.y) / (p2.x - p1.x);
-
-
-	if(slope >= 0 && slope < 1){
-		// normal midpoint algorithm with color interpolation
-		for(int x = p1.x; x <= p2.x; x++){
-			if(depth[x][y] > p1.z){
-				image[x][y].r = (round(c->r));
-				image[x][y].g = (round(c->g));
-				image[x][y].b = (round(c->b));
-				depth[x][y] = p1.z;
-			}
-			if(d < 0){
-				y += 1;
-				d += (p1.y - p2.y) + (p2.x - p1.x);
-			}
-			else{
-				d += (p1.y - p2.y);
-			}
-			c->r += dc->r;
-			c->g += dc->g;
-			c->b += dc->b;
-		}
-	}
-
-	if(slope >= 1 ){
-		// swap x and y
-		double temp = p1.x;
-		p1.x = p1.y;
-		p1.y = temp;
-		temp = p2.x;
-		p2.x = p2.y;
-		p2.y = temp;
-
-		// normal midpoint algorithm with color interpolation
-		for(int x = p1.x; x <= p2.x; x++){
-			if(depth[y][x] > p1.z){
-				image[y][x].r = (round(c->r));
-				image[y][x].g = (round(c->g));
-				image[y][x].b = (round(c->b));
-				depth[y][x] = p1.z;
-			}
-			if(d < 0){
-				y += 1;
-				d += (p1.y - p2.y) + (p2.x - p1.x);
-			}
-			else{
-				d += (p1.y - p2.y);
-			}
-			c->r += dc->r;
-			c->g += dc->g;
-			c->b += dc->b;
-		}
-	}
-	if(slope <0 && slope > -1){
-		// normal midpoint algorithm with color interpolation
-		for(int x = p1.x; x <= p2.x; x++){
-			if(depth[x][y] > p1.z){
-				image[x][y].r = (round(c->r));
-				image[x][y].g = (round(c->g));
-				image[x][y].b = (round(c->b));
-				depth[x][y] = p1.z;
-			}
-			if(d > 0){
-				y -= 1;
-				d += (p1.y - p2.y) + (p2.x - p1.x);
-			}
-			else{
-				d += (p1.y - p2.y);
-			}
-			c->r += dc->r;
-			c->g += dc->g;
-			c->b += dc->b;
-		}
-	}
-	if(slope <= -1 ){
-		// swap x and y
-		double temp = p1.x;
-		p1.x = p1.y;
-		p1.y = temp;
-		temp = p2.x;
-		p2.x = p2.y;
-		p2.y = temp;
-
-		// normal midpoint algorithm with color interpolation
-		for(int x = p1.x; x <= p2.x; x++){
-			if(depth[y][x] > p1.z){
-				image[y][x].r = (round(c->r));
-				image[y][x].g = (round(c->g));
-				image[y][x].b = (round(c->b));
-				depth[y][x] = p1.z;
-			}
-			if(d > 0){
-				y -= 1;
-				d += (p1.y - p2.y) + (p2.x - p1.x);
-			}
-			else{
-				d += (p1.y - p2.y);
-			}
-			c->r += dc->r;
-			c->g += dc->g;
-			c->b += dc->b;
-		}
-	}
-
-}
 
 double f_xy(double x, double y, double x0, double y0, double x1, double y1) {
     return x * (y0 - y1) + y * (x1 - x0) + (x0 * y1 - y0 * x1);
@@ -998,7 +805,7 @@ void triangleRasterizationFunc(Vec4& p0, Vec4& p1, Vec4& p2, Color& c1, Color& c
 // Helper function to transform vertices
 void transformVertices(const Matrix4& AppliedMatrix, Vec3* vertex, Vec4& transformedVertex) {
     // Convert Vec3 to Vec4
-    transformedVertex = Vec4(vertex->x, vertex->y, vertex->z, 1, vertex->colorId);
+    // transformedVertex = Vec4(vertex->x, vertex->y, vertex->z, 1, vertex->colorId);
 
     // Apply transformation
     transformedVertex = multiplyMatrixWithVec4(AppliedMatrix, transformedVertex);
@@ -1011,7 +818,6 @@ void perspectiveDivide(double &x, double &y, double &z, double &t) {
     z /= t;
     t = 1; // Normalizing the t component after division
 }
-
 
 /*
 	Transformations, clipping, culling, rasterization are done here.
@@ -1052,7 +858,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 			Color *c3 = this->colorsOfVertices[v3->colorId-1];
 
 			// Apply transformations to vertices
-			Vec4 v1_4, v2_4, v3_4;
+			Vec4 v1_4 = Vec4(v1->x, v1->y, v1->z, 1, v1->colorId);
+			Vec4 v2_4 = Vec4(v2->x, v2->y, v2->z, 1, v2->colorId);
+			Vec4 v3_4 = Vec4(v3->x, v3->y, v3->z, 1, v3->colorId);
+
 			transformVertices(CameraModelingAndProjectionMatrix, v1, v1_4);
 			transformVertices(CameraModelingAndProjectionMatrix, v2, v2_4);
 			transformVertices(CameraModelingAndProjectionMatrix, v3, v3_4);
@@ -1077,9 +886,10 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				perspectiveDivide(v3_4.x, v3_4.y, v3_4.z, v3_4.t);
 
 				Vec4 v1_4_copy = v1_4;
-				Vec4 v2_4_copy = v2_4;
-				Vec4 v3_4_copy = v3_4;
+				Vec4 v2_4_copy =v2_4;
+				Vec4 v3_4_copy =v3_4;
 
+				// is it right??
 				Color* c1_copy = new Color(); Color* c2_copy = new Color(); Color* c3_copy = new Color();
 				c1_copy->r = c1->r; c1_copy->g = c1->g; c1_copy->b = c1->b;
 				c2_copy->r = c2->r; c2_copy->g = c2->g; c2_copy->b = c2->b;
@@ -1095,12 +905,12 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// returns true if line is visible
 				// returns false if line is invisible
 				// two edges (v1,v2), (v2,v3), (v3,v1)
-				bool visibleLine1 = clippingLiangBarsky(*c1_copy,*c2_copy, v1_4, v2_4, -1, 1, -1, 1, -1, 1);
+				bool visibleLine1 = clippingLiangBarsky(*c1_copy,*c2_copy, v1_4, v2_4, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 				// std::cout << "visibleLine1: " << visibleLine1 << std::endl;
 
-				bool visibleLine2 = clippingLiangBarsky(*c2_copy_2,*c3, v2_4_copy, v3_4, -1, 1, -1, 1, -1, 1);
+				bool visibleLine2 = clippingLiangBarsky(*c2_copy_2,*c3_copy, v2_4_copy, v3_4, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 				// std::cout << "visibleLine2: " << visibleLine2 << std::endl;
-				bool visibleLine3 = clippingLiangBarsky(*c3_copy_2,*c1_copy_2, v3_4_copy, v1_4_copy, -1, 1, -1, 1, -1, 1);
+				bool visibleLine3 = clippingLiangBarsky(*c3_copy_2,*c1_copy_2, v3_4_copy, v1_4_copy, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
 				// std::cout << "visibleLine3: " << visibleLine3 << std::endl;
 
 				// now viewport transformation will be done here
@@ -1116,15 +926,15 @@ void Scene::forwardRenderingPipeline(Camera *camera)
 				// now rasterization will be done here
 				if(visibleLine1){
 					// lineRasterization function
-					lineRasterizationFunc(v1_4, v2_4, *c1, *c2, this->image, this->depth);
+					lineRasterizationFunc_2condition(v1_4, v2_4, *c1_copy, *c2_copy, this->image, this->depth);
 				}
 				if(visibleLine2){
 					// lineRasterization function
-					lineRasterizationFunc(v2_4_copy, v3_4, *c2, *c3, this->image, this->depth);
+					lineRasterizationFunc_2condition(v2_4_copy, v3_4, *c2_copy_2, *c3_copy, this->image, this->depth);
 				}
 				if(visibleLine3){
 					// lineRasterization function
-					lineRasterizationFunc(v3_4_copy, v1_4_copy, *c3, *c1, this->image, this->depth);
+					lineRasterizationFunc_2condition(v3_4_copy, v1_4_copy, *c3_copy_2, *c1_copy_2, this->image, this->depth);
 				}
 
 				// avoid memory leak
